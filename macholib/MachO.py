@@ -39,6 +39,7 @@ from .mach_o import (
     section,
     section_64,
 )
+from .macho_fixups import read_exports, read_fixups
 from .ptypes import sizeof
 
 try:
@@ -474,6 +475,35 @@ class MachOHeader(object):
             if lc.cmd == LC_DYSYMTAB:
                 return cmd
         return None
+
+    def getFixups(self):
+        """
+        Return the dyld rebase and bind locations of this header as a
+        list of dictionaries.  Classic LC_DYLD_INFO[_ONLY] opcode streams
+        and the generic 64-bit LC_DYLD_CHAINED_FIXUPS pointer chains are
+        covered.  Only 64-bit headers are supported; other headers return
+        an empty list.  The input file and the parsed load commands are
+        never modified.
+        """
+        if self.MH_MAGIC not in (MH_MAGIC_64, MH_CIGAM_64):
+            return []
+        if not hasattr(self, "_fixup_entries"):
+            self._fixup_entries = read_fixups(self)
+        return self._fixup_entries
+
+    def getExports(self):
+        """
+        Return the exported symbols described by the classic dyld info
+        export trie or by an LC_DYLD_EXPORTS_TRIE command as a list of
+        dictionaries.  Only 64-bit headers are supported; other headers
+        return an empty list.  The input file and the parsed load
+        commands are never modified.
+        """
+        if self.MH_MAGIC not in (MH_MAGIC_64, MH_CIGAM_64):
+            return []
+        if not hasattr(self, "_export_entries"):
+            self._export_entries = read_exports(self)
+        return self._export_entries
 
     def get_filetype_shortname(self, filetype):
         if filetype in MH_FILETYPE_SHORTNAMES:
